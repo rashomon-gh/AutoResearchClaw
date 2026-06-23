@@ -364,9 +364,10 @@ _DEFAULT_STAGES: dict[str, dict[str, Any]] = {
         "user": (
             "{preamble}\n\n"
             "{domain_design_context}"
-            "Design an experiment plan as YAML.\n"
+            "Design an experiment plan as JSON (NOT YAML).\n"
             "Required keys: objectives,datasets,baselines,proposed_methods,"
-            "ablations,metrics,risks,compute_budget.\n\n"
+            "ablations,metrics,risks,compute_budget.\n"
+            "Output ONLY valid JSON — no prose, no markdown fences.\n\n"
             "NAMING REQUIREMENT (CRITICAL for paper quality):\n"
             "- Every condition name in baselines, proposed_methods, and ablations MUST be "
             "a DESCRIPTIVE algorithm name DERIVED FROM THE HYPOTHESES ABOVE, NOT a generic label.\n"
@@ -845,7 +846,7 @@ _DEFAULT_STAGES: dict[str, dict[str, Any]] = {
             "- Report effect sizes (Cohen's d) alongside p-values\n\n"
             "Experiment plan:\n{exp_plan}"
         ),
-        "max_tokens": 8192,
+        "max_tokens": 16384,
     },
     "resource_planning": {
         "system": "You are an experiment scheduler.",

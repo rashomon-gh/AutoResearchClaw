@@ -128,8 +128,7 @@ The pipeline runs **end-to-end** — fully autonomous or with human-in-the-loop 
 # 1. Clone & install
 git clone https://github.com/aiming-lab/AutoResearchClaw.git
 cd AutoResearchClaw
-python3 -m venv .venv && source .venv/bin/activate
-pip install -e .
+./scripts/env_setup.sh        # venv + deps + Playwright Chromium browser
 
 # 2. Setup (interactive — installs OpenCode beast mode, checks Docker/LaTeX)
 researchclaw setup

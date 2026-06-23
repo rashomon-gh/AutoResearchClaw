@@ -847,7 +847,7 @@ STAGES: dict[str, dict[str, Any]] = {
             "not fabricated.\n\n"
             "Experiment plan:\n{exp_plan}"
         ),
-        "max_tokens": 8192,
+        "max_tokens": 16384,
     },
     "resource_planning": {
         "system": (

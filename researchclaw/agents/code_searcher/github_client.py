@@ -107,6 +107,12 @@ class GitHubClient:
             with urllib.request.urlopen(req, timeout=15) as resp:
                 return json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
+            if e.code == 401:
+                logger.debug(
+                    "GitHub API requires authentication (401). "
+                    "Set GITHUB_TOKEN env var for code search. Skipping."
+                )
+                return None
             if e.code == 403:
                 logger.warning("GitHub API rate limited (403). Skipping.")
                 return None

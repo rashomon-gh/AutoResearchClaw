@@ -132,7 +132,7 @@ class TestPromptManagerDefaults:
 
     def test_max_tokens(self) -> None:
         pm = PromptManager()
-        assert pm.max_tokens("code_generation") == 8192
+        assert pm.max_tokens("code_generation") == 16384
         assert pm.max_tokens("paper_draft") == 16384
         assert pm.max_tokens("topic_init") is None
 

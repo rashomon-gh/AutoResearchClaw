@@ -160,6 +160,7 @@ class LLMClient:
             wire_api=getattr(rc_config.llm, "wire_api", "chat_completions"),
             primary_model=rc_config.llm.primary_model or "gpt-4o",
             fallback_models=list(rc_config.llm.fallback_models or []),
+            max_tokens=getattr(rc_config.llm, "max_tokens", 4096),
             fallback_url=fallback_url,
             fallback_api_key=fallback_api_key,
             timeout_sec=getattr(rc_config.llm, "timeout_sec", 600),
@@ -680,5 +681,6 @@ def create_client_from_yaml(yaml_path: str | None = None) -> LLMClient:
             fallback_models=llm_section.get(
                 "fallback_models", ["gpt-4.1", "gpt-4o-mini"]
             ),
+            max_tokens=llm_section.get("max_tokens", 4096),
         )
     )

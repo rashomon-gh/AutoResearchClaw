@@ -489,7 +489,7 @@ def _execute_code_generation(
     # --- Code generation: Beast Mode → CodeAgent → Legacy single-shot ---
     _code_agent_active = False
     _beast_mode_used = False
-    _code_max_tokens = 8192
+    _code_max_tokens = 16384
 
     # ── Beast Mode: OpenCode external agent (optional) ─────────────────
     _oc_cfg = config.experiment.opencode
@@ -636,7 +636,7 @@ def _execute_code_generation(
             config.llm.primary_model.startswith(p)
             for p in ("gpt-5", "o3", "o4")
         ):
-            _code_max_tokens = 16384
+            _code_max_tokens = max(_code_max_tokens, 16384)
 
         # ── Domain detection + Code Search for non-ML domains ──────────
         _domain_profile = None
@@ -688,7 +688,15 @@ def _execute_code_generation(
             max_tokens=_code_max_tokens,
         )
         files = _agent_result.files
-        _code_agent_active = True
+        # Only mark CodeAgent as active if it actually produced files.
+        # If it returned empty (LLM didn't produce parseable output),
+        # we fall through to the Legacy single-shot path below.
+        _code_agent_active = bool(files)
+        if not files:
+            logger.warning(
+                "CodeAgent produced no files — falling back to legacy "
+                "single-shot generation"
+            )
 
         # Write agent artifacts
         (stage_dir / "code_agent_log.json").write_text(
@@ -715,7 +723,7 @@ def _execute_code_generation(
             _agent_result.total_sandbox_runs,
             _agent_result.best_score,
         )
-    elif not _beast_mode_used and llm is not None:
+    if not _beast_mode_used and not _code_agent_active and not files and llm is not None:
         # ── Legacy single-shot generation ─────────────────────────────────
         topic = config.research.topic
         _md = config.experiment.metric_direction
@@ -735,7 +743,8 @@ def _execute_code_generation(
         )
         # R13-3: Use higher max_tokens for reasoning models (they consume tokens
         # for internal chain-of-thought). Retry once with even higher limit on empty.
-        _code_max_tokens = sp.max_tokens or 8192
+        # Base 16384 is the minimum for multi-file experiment generation.
+        _code_max_tokens = sp.max_tokens or 16384
         if any(config.llm.primary_model.startswith(p) for p in ("gpt-5", "o3", "o4")):
             _code_max_tokens = max(_code_max_tokens, 16384)
 
@@ -772,16 +781,26 @@ def _execute_code_generation(
                 resp.content[:300],
             )
 
-    # --- Fallback: generic numerical experiment ---
+    # --- Fallback: last-resort experiment scaffold ---
+    # When all LLM generation paths fail, produce a minimal but topic-aware
+    # scaffold so downstream stages have something to work with.  This is
+    # NOT a real experiment — it will be flagged by the alignment check.
     if not files:
+        _topic_safe = config.research.topic.replace("'", "\\'").replace("\n", " ")
+        _metric_safe = metric.replace("'", "\\'")
         files = {
             "main.py": (
                 "import numpy as np\n"
                 "\n"
                 "np.random.seed(42)\n"
                 "\n"
-                "# Fallback experiment: parameter sweep on a synthetic objective\n"
-                "# This runs when LLM code generation fails to produce valid code.\n"
+                f"# Topic: {_topic_safe}\n"
+                "# Metric: {_metric_safe}\n"
+                "# WARNING: This is a fallback scaffold — LLM code generation\n"
+                "# failed to produce parseable output. All generation paths\n"
+                "# (Beast Mode, CodeAgent, Legacy single-shot) returned empty.\n"
+                "# This scaffold exists so downstream stages can proceed but\n"
+                "# will NOT pass the topic-experiment alignment check.\n"
                 "dim = 10\n"
                 "n_conditions = 3\n"
                 "results = {}\n"
@@ -796,10 +815,10 @@ def _execute_code_generation(
                 "        scores.append(score)\n"
                 "    mean_score = float(np.mean(scores))\n"
                 "    results[cond_name] = mean_score\n"
-                f"    print(f'condition={{cond_name}} {metric}: {{mean_score:.6f}}')\n"
+                f"    print(f'condition={{cond_name}} {_metric_safe}: {{mean_score:.6f}}')\n"
                 "\n"
                 "best = max(results, key=results.get)\n"
-                f"print(f'{metric}: {{results[best]:.6f}}')\n"
+                f"print(f'{_metric_safe}: {{results[best]:.6f}}')\n"
             )
         }
 

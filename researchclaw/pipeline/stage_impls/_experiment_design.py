@@ -219,19 +219,24 @@ def _execute_experiment_design(
             json_mode=sp.json_mode,
             max_tokens=sp.max_tokens,
         )
-        raw_yaml = _extract_yaml_block(resp.content)
-        try:
-            parsed = yaml.safe_load(raw_yaml)
-        except yaml.YAMLError:
-            parsed = None
-        # Fallback: reasoning models sometimes emit the YAML without fences
-        # or wrapped in prose. Try parsing the whole response as YAML.
+        # Primary: JSON parsing (robust — handles fenced JSON, balanced braces)
+        parsed = _safe_json_loads(resp.content, None)
+        # Fallback 1: YAML parsing (for backward compat with YAML-emitting models)
+        raw_yaml = ""
+        if not isinstance(parsed, dict):
+            raw_yaml = _extract_yaml_block(resp.content)
+            try:
+                parsed = yaml.safe_load(raw_yaml)
+            except yaml.YAMLError:
+                parsed = None
+        # Fallback 2: reasoning models sometimes emit the YAML/JSON without
+        # fences or wrapped in prose. Try parsing the whole response as YAML.
         if not isinstance(parsed, dict):
             try:
                 parsed = yaml.safe_load(resp.content)
             except yaml.YAMLError:
                 pass
-        # Last fallback: try to find any YAML-like dict in the response
+        # Fallback 3: try to find any YAML-like dict in the response
         if not isinstance(parsed, dict):
             import re as _re_yaml
 
@@ -260,7 +265,7 @@ def _execute_experiment_design(
             plan = parsed
         else:
             logger.warning(
-                "Stage 09: LLM response could not be parsed as YAML "
+                "Stage 09: LLM response could not be parsed as JSON/YAML "
                 "(len=%d, first 200 chars: %s). Content extraction method "
                 "returned: %s",
                 len(resp.content),
@@ -269,9 +274,9 @@ def _execute_experiment_design(
             )
             # BUG-12: Retry with a stricter, shorter prompt
             if llm is not None:
-                logger.info("Stage 09: Retrying with strict YAML-only prompt...")
+                logger.info("Stage 09: Retrying with strict JSON-only prompt...")
                 _retry_prompt = (
-                    "Output ONLY valid YAML. No prose, no markdown fences, no explanation.\n"
+                    "Output ONLY valid JSON. No prose, no markdown fences, no explanation.\n"
                     f"Topic: {config.research.topic}\n"
                     "Required keys: baselines, proposed_methods, ablations, "
                     "datasets, metrics, objectives, risks, compute_budget.\n"
@@ -279,17 +284,14 @@ def _execute_experiment_design(
                 )
                 _retry_resp = _chat_with_prompt(
                     llm,
-                    "You output ONLY valid YAML. Nothing else.",
+                    "You output ONLY valid JSON. Nothing else.",
                     _retry_prompt,
                     max_tokens=4096,
                 )
-                try:
-                    _retry_parsed = yaml.safe_load(_retry_resp.content)
-                    if isinstance(_retry_parsed, dict):
-                        plan = _retry_parsed
-                        logger.info("Stage 09: Strict YAML retry succeeded.")
-                except yaml.YAMLError:
-                    pass
+                _retry_parsed = _safe_json_loads(_retry_resp.content, None)
+                if isinstance(_retry_parsed, dict):
+                    plan = _retry_parsed
+                    logger.info("Stage 09: Strict JSON retry succeeded.")
 
     # BUG-12: Fallback 4 — extract method/baseline names from Stage 8 hypotheses
     if plan is None:

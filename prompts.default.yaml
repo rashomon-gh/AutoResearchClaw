@@ -70,7 +70,7 @@ blocks:
     '
 stages:
   code_generation:
-    max_tokens: 8192
+    max_tokens: 16384
     system: You are a computational scientist who writes real, runnable experiments. Your code implements actual algorithms
       with real mathematical operations. You NEVER fake results with random number generators. Always use the ```filename:xxx.py
       format for each file. Use numpy for numerical computation. Keep code self-contained and deterministic.
@@ -96,9 +96,11 @@ stages:
     user: '{preamble}
 
 
-      Design an experiment plan as YAML.
+      Design an experiment plan as JSON (NOT YAML).
 
       Required keys: objectives,datasets,baselines,proposed_methods,ablations,metrics,risks,compute_budget.
+
+      Each key maps to a list of strings. Output ONLY valid JSON — no prose, no markdown fences.
 
       Hypotheses:
 
